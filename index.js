@@ -28,13 +28,24 @@ const defaultVersionUrlFormats = {
 class KeepAChangelog extends Plugin {
   async init() {
     await super.init();
-    const { filename, strictLatest, addUnreleased, keepUnreleased, addVersionUrl, versionUrlFormats, head } = this.options;
+    const {
+      filename,
+      strictLatest,
+      addUnreleased,
+      keepUnreleased,
+      addVersionUrl,
+      versionUrlFormats,
+      head,
+      useUnreleasedWithNoIncrement
+    } = this.options;
 
     this.filename = filename || 'CHANGELOG.md';
     this.strictLatest = strictLatest === undefined ? true : Boolean(strictLatest);
     this.addUnreleased = addUnreleased === undefined ? false : Boolean(addUnreleased);
     this.keepUnreleased = keepUnreleased === undefined ? false : Boolean(keepUnreleased);
     this.addVersionUrl = addVersionUrl === undefined ? false : Boolean(addVersionUrl);
+    this.useUnreleasedWithNoIncrement =
+      useUnreleasedWithNoIncrement === undefined ? false : Boolean(useUnreleasedWithNoIncrement);
     this.versionUrlFormats = versionUrlFormats
       ? { ...defaultVersionUrlFormats, ...versionUrlFormats }
       : defaultVersionUrlFormats;
@@ -56,7 +67,7 @@ class KeepAChangelog extends Plugin {
     const { changelog } = this.getContext();
     if (changelog) return changelog;
 
-    const { filename, strictLatest } = this;
+    const { filename, strictLatest, useUnreleasedWithNoIncrement } = this;
     const previousReleaseTitle = strictLatest ? `## [${latestVersion}]` : `## [`;
     const hasPreviousReleaseSection = this.changelogContent.includes(previousReleaseTitle);
     if (strictLatest && !hasPreviousReleaseSection) {
@@ -64,7 +75,8 @@ class KeepAChangelog extends Plugin {
     }
 
     const { isIncrement } = this.config;
-    const titleToFind = isIncrement ? this.unreleasedTitleRaw : latestVersion;
+    const titleToFind = isIncrement || useUnreleasedWithNoIncrement ? this.unreleasedTitleRaw : latestVersion;
+
     const changelogContent = this.getChangelogEntryContent(titleToFind);
 
     this.setContext({ changelog: changelogContent });
@@ -72,7 +84,7 @@ class KeepAChangelog extends Plugin {
   }
 
   getChangelogEntryContent(releaseTitleRaw) {
-    const { filename, changelogContent, EOL } = this;
+    const { filename, changelogContent, EOL, useUnreleasedWithNoIncrement } = this;
 
     const releaseTitleMarkdown = `## [${releaseTitleRaw}]`;
     const previousReleaseTitle = `## [`;
@@ -84,7 +96,13 @@ class KeepAChangelog extends Plugin {
     }
 
     const entryContentStartIndex = changelogContent.indexOf(EOL, indexOfReleaseTitle);
-    let entryContentEndIndex = changelogContent.indexOf(previousReleaseTitle, entryContentStartIndex);
+    const indexOfPreviousReleaseTitle = changelogContent.indexOf(previousReleaseTitle, entryContentStartIndex);
+
+    const indexToStartSearchForEntryContentEnd = useUnreleasedWithNoIncrement
+      ? indexOfPreviousReleaseTitle
+      : entryContentStartIndex;
+
+    let entryContentEndIndex = changelogContent.indexOf(previousReleaseTitle, indexToStartSearchForEntryContentEnd);
     if (entryContentEndIndex === -1) {
       entryContentEndIndex = changelogContent.length;
     }
@@ -136,9 +154,9 @@ class KeepAChangelog extends Plugin {
   }
 
   beforeRelease() {
-    const { addUnreleased, keepUnreleased, addVersionUrl } = this;
+    const { addUnreleased, keepUnreleased, addVersionUrl, useUnreleasedWithNoIncrement } = this;
     const { isDryRun, isIncrement } = this.config;
-    if (isDryRun || keepUnreleased || !isIncrement) return;
+    if (isDryRun || keepUnreleased || (!isIncrement && !useUnreleasedWithNoIncrement)) return;
     const { version } = this.getContext();
     const formattedDate = getFormattedDate();
     const unreleasedTitle = addUnreleased ? this.unreleasedTitle + this.EOL + this.EOL : '';

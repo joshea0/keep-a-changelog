@@ -31,12 +31,29 @@ mock({
     '## [Unreleased]\n\n* Item A\n* Item B\n\n## [1.0.0] - 2020-05-02\n\n* Item C\n* Item D\n\n[unreleased]: https://github.com/user/project/compare/1.0.0..HEAD\n[1.0.0]: https://github.com/user/project/compare/0.0.0...1.0.0',
   './CHANGELOG-VERSION_URL_UNRELEASED_TITLE_CASE.md':
     '## [Unreleased]\n\n* Item A\n* Item B\n\n## [1.0.0] - 2020-05-02\n\n* Item C\n* Item D\n\n[Unreleased]: https://github.com/user/project/compare/1.0.0..HEAD\n[1.0.0]: https://github.com/user/project/compare/0.0.0...1.0.0',
-  './CHANGELOG-VERSION_URL_NEW.md': '## [Unreleased]\n\n* Item A\n* Item B\n'
+  './CHANGELOG-VERSION_URL_NEW.md': '## [Unreleased]\n\n* Item A\n* Item B\n',
+  './CHANGELOG-USE_UNRELEASED_WITH_NO_INCREMENT.md':
+    '## [Unreleased]\n\n* Item A\n* Item B\n\n## [1.0.0] - 2020-05-02\n\n* Item C\n* Item D'
 });
 
 const readFile = file => fs.readFileSync(file).toString();
 
 const namespace = 'keep-a-changelog';
+
+test('should use "unreleased" section and populate "1.1.0" when no-increment flag is and useUnreleasedWithNoIncrement option is set', async t => {
+  const options = {
+    increment: false,
+    [namespace]: {
+      filename: 'CHANGELOG-USE_UNRELEASED_WITH_NO_INCREMENT.md',
+      useUnreleasedWithNoIncrement: true,
+      strictLatest: false
+    }
+  };
+  const plugin = factory(Plugin, { namespace, options });
+  sinon.stub(plugin, 'getLatestVersion').returns('1.1.0');
+  await runTasks(plugin);
+  assert.equal(plugin.getChangelog('1.1.0'), '* Item A\n* Item B');
+});
 
 test('should throw for missing changelog file', async t => {
   const options = { [namespace]: {} };
